@@ -20,14 +20,20 @@
 #include "stm32h723xx.h"
 
 #define                 LED_GREEN_PORT                                  GPIOB
-#define                 LED_GREEN_PIN                                   0U
+#define                 LED_GREEN_PIN                                   0UL
 #define                 LED_RED_PORT                                    GPIOB
-#define                 LED_RED_PIN                                     14U
+#define                 LED_RED_PIN                                     14UL
 #define                 LED_YELLOW_PORT                                 GPIOE
-#define                 LED_YELLOW_PIN                                  1U
+#define                 LED_YELLOW_PIN                                  1UL
 
 #define                 BUTTON_USER_PORT                                GPIOC
-#define                 BUTTON_USER_PIN                                 13U
+#define                 BUTTON_USER_PIN                                 13UL
+
+#define                 ADC1_INP2_PORT                                  GPIOF
+#define                 ADC1_INP2_PIN                                   11UL
+
+#define                 ADC1_INP3_PORT                                  GPIOA
+#define                 ADC1_INP3_PIN                                   6UL
 
 int main(void)
 {
@@ -69,10 +75,26 @@ int main(void)
     RCC->D3CFGR |= 0x4UL << RCC_D3CFGR_D3PPRE_Pos;
 
     RCC->CR |= RCC_CR_PLL1ON;
-            while(!(RCC->CR & RCC_CR_PLL1RDY));
-            RCC->CFGR &= ~RCC_CFGR_SW;
-            RCC->CFGR |= RCC_CFGR_SW_PLL1;
-            while((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL1);
+    while(!(RCC->CR & RCC_CR_PLL1RDY));
+    RCC->CFGR &= ~RCC_CFGR_SW;
+    RCC->CFGR |= RCC_CFGR_SW_PLL1;
+    while((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL1);
+    // ====================================================================================================
+    // PLL2 for ADC
+    // RCC->PLLCKSELR &= ~RCC_PLLCKSELR_DIVM2;
+    // RCC->PLLCKSELR |= 4UL << RCC_PLLCKSELR_DIVM2_Pos;
+
+    // RCC->PLLCFGR &= ~(RCC_PLLCFGR_PLL2FRACEN | RCC_PLLCFGR_PLL2VCOSEL | RCC_PLLCFGR_PLL2RGE | RCC_PLLCFGR_DIVQ2EN | RCC_PLLCFGR_DIVR2EN);
+    // RCC->PLLCFGR |= RCC_PLLCFGR_PLL2RGE_1 | RCC_PLLCFGR_DIVP2EN;
+
+    // RCC->PLL2DIVR = 0x0U;
+    // RCC->PLL2DIVR |= ((320UL - 1UL) << RCC_PLL2DIVR_N2_Pos) |
+    //                  ((1UL - 1UL) << RCC_PLL2DIVR_P2_Pos) |
+    //                  RCC_PLL2DIVR_Q2 |
+    //                  RCC_PLL2DIVR_R2;
+
+    // RCC->CR |= RCC_CR_PLL2ON;
+    // while(!(RCC->CR & RCC_CR_PLL2RDY));
     // ====================================================================================================
     SCB->CPACR |= ((3UL << 10 * 2) | (3UL << 11 * 2));
     // ====================================================================================================
@@ -103,6 +125,43 @@ int main(void)
 
     BUTTON_USER_PORT->MODER &= ~(0x3UL << (BUTTON_USER_PIN * 2));
     // ====================================================================================================
+    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
+
+    ADC1_INP2_PORT->MODER &= ~(0x3UL << (ADC1_INP2_PIN * 2));
+    ADC1_INP2_PORT->MODER |= 0x3UL << (ADC1_INP2_PIN * 2);
+
+    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;
+
+    // ADC1_INP3_PORT->MODER &= ~(0x3UL << (ADC1_INP3_PIN * 2));
+    // ADC1_INP3_PORT->MODER |= 0x3UL << (ADC1_INP3_PIN * 2));
+
+    RCC->AHB1ENR |= RCC_AHB1ENR_ADC12EN;
+
+    ADC12_COMMON->CCR &= ~(ADC_CCR_CKMODE | ADC_CCR_PRESC);
+    ADC12_COMMON->CCR |= 0x1UL << ADC_CCR_CKMODE;
+
+    ADC1->CR &= ~ADC_CR_DEEPPWD;
+    ADC1->CR |= ADC_CR_ADVREGEN;
+    // for(uint32_t n = 0; n < 10000; n++) __NOP();
+    while(!(ADC1->ISR & ADC_ISR_LDORDY)) __NOP();
+
+    ADC1->CR &= ~ADC_CR_ADEN;
+
+    ADC1->CR &= ~ADC_CR_ADCALDIF;
+    ADC1->CR |= ADC_CR_ADCALLIN;
+    ADC1->CR |= ADC_CR_ADCAL;
+    while(ADC1->CR & ADC_CR_ADCAL) __NOP();
+
+    ADC1->ISR |= ADC_ISR_ADRDY;
+    ADC1->CR  |= ADC_CR_ADEN;
+    while (!(ADC1->ISR & ADC_ISR_ADRDY)) __NOP();
+
+    ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_2;
+    // ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
+
+    ADC1->CFGR |= ADC_CFGR_CONT | ADC_CFGR_OVRMOD;
+
+    // TODO configure ADC channels, sampling time, etc.
 
 	for(;;);
 }
