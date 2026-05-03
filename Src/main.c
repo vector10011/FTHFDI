@@ -35,7 +35,12 @@
 #define                 ADC1_INP3_PORT                                  GPIOA
 #define                 ADC1_INP3_PIN                                   6UL
 
-volatile uint32_t adc_value;
+#define                 ADC1_DMAMUX_INPUT                               9UL
+#define                 ADC1_DMAMUX_CH                                  DMAMUX1_Channel4
+#define                 ADC1_DMA                                        DMA1
+#define                 ADC1_DMA_STREAM                                 DMA1_Stream4
+
+volatile uint16_t adc_value[2];
 
 int main(void)
 {
@@ -127,17 +132,34 @@ int main(void)
 
     BUTTON_USER_PORT->MODER &= ~(0x3UL << (BUTTON_USER_PIN * 2));
     // ====================================================================================================
+    // DMA configuration for ADC1
+
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    ADC1_DMA_STREAM->CR &= ~DMA_SxCR_EN;
+    ADC1_DMA_STREAM->CR = 0x0U << DMA_SxCR_DIR_Pos |
+                          DMA_SxCR_CIRC |
+                          DMA_SxCR_MINC |
+                          0x1U << DMA_SxCR_PSIZE_Pos |
+                          0x1U << DMA_SxCR_MSIZE_Pos;
     
+    ADC1_DMA_STREAM->NDTR = 2UL;
+    ADC1_DMA_STREAM->PAR = (uint32_t)&ADC1->DR;
+    ADC1_DMA_STREAM->M0AR = (uint32_t)adc_value;
+
+    ADC1_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
+    ADC1_DMAMUX_CH->CCR |= ADC1_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
+
+    ADC1_DMA_STREAM->CR |= DMA_SxCR_EN;
     // ====================================================================================================
     RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
 
     ADC1_INP2_PORT->MODER &= ~(0x3UL << (ADC1_INP2_PIN * 2));
     ADC1_INP2_PORT->MODER |= 0x3UL << (ADC1_INP2_PIN * 2);
 
-    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;
+    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;
 
-    // ADC1_INP3_PORT->MODER &= ~(0x3UL << (ADC1_INP3_PIN * 2));
-    // ADC1_INP3_PORT->MODER |= 0x3UL << (ADC1_INP3_PIN * 2));
+    ADC1_INP3_PORT->MODER &= ~(0x3UL << (ADC1_INP3_PIN * 2));
+    ADC1_INP3_PORT->MODER |= 0x3UL << (ADC1_INP3_PIN * 2);
 
     RCC->AHB1ENR |= RCC_AHB1ENR_ADC12EN;
 
@@ -160,7 +182,7 @@ int main(void)
     ADC1->CR &= ~ADC_CR_ADEN;
 
     ADC1->CR &= ~ADC_CR_ADCALDIF;
-    // ADC1->CR |= ADC_CR_ADCALLIN;
+    ADC1->CR |= ADC_CR_ADCALLIN;
     ADC1->CR |= ADC_CR_ADCAL;
     while(ADC1->CR & ADC_CR_ADCAL) __NOP();
 
@@ -170,25 +192,31 @@ int main(void)
 
     ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_2;
     ADC1->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_2;
-    // ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
+    ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
+    ADC1->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_3;
 
-    ADC1->CFGR |= ADC_CFGR_CONT | ADC_CFGR_OVRMOD;
+    ADC1->CFGR |= 0x3U << ADC_CFGR_DMNGT_Pos |
+                  ADC_CFGR_OVRMOD |
+                  ADC_CFGR_CONT |
+                  ADC_CFGR_OVRMOD;
 
     // TODO configure ADC channels, sampling time, etc.
-    ADC1->SQR1 = 0x0U;
+    ADC1->SQR1 = 0x1U;
     ADC1->SQR1 |= (2UL << ADC_SQR1_SQ1_Pos);
-    // ADC1->SQR1 |= (3UL << ADC_SQR1_SQ1_Pos);
+    ADC1->SQR1 |= (3UL << ADC_SQR1_SQ2_Pos);
 
-    ADC1->CFGR |= ADC_CFGR_CONT;
+    ADC1->SMPR1 = 0x0U;
+    ADC1->SMPR1 |= (0x7UL << ADC_SMPR1_SMP2_Pos);
+    ADC1->SMPR1 |= (0x7UL << ADC_SMPR1_SMP3_Pos);
 
     ADC1->CR |= ADC_CR_ADSTART;
 
 	for(;;)
     {
-        if (ADC1->ISR & ADC_ISR_EOC)
-        {
-            adc_value = ADC1->DR;
-        }
+        // if (ADC1->ISR & ADC_ISR_EOC)
+        // {
+        //     adc_value = ADC1->DR;
+        // }
     }
 }
 
