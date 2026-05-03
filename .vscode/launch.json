@@ -17,7 +17,8 @@
         "enabled": true,
         "samplesPerSecond": 4,
         "expressions": [
-          "adc_value"
+          "adc_value",
+          "dfsdm_value"
         ]
       }
     }

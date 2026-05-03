@@ -41,6 +41,7 @@
 #define                 ADC1_DMA_STREAM                                 DMA1_Stream4
 
 volatile uint16_t adc_value[2];
+volatile int32_t dfsdm_value;
 
 int main(void)
 {
@@ -134,22 +135,22 @@ int main(void)
     // ====================================================================================================
     // DMA configuration for ADC1
 
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-    ADC1_DMA_STREAM->CR &= ~DMA_SxCR_EN;
-    ADC1_DMA_STREAM->CR = 0x0U << DMA_SxCR_DIR_Pos |
-                          DMA_SxCR_CIRC |
-                          DMA_SxCR_MINC |
-                          0x1U << DMA_SxCR_PSIZE_Pos |
-                          0x1U << DMA_SxCR_MSIZE_Pos;
+    // RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    // ADC1_DMA_STREAM->CR &= ~DMA_SxCR_EN;
+    // ADC1_DMA_STREAM->CR = 0x0U << DMA_SxCR_DIR_Pos |
+    //                       DMA_SxCR_CIRC |
+    //                       DMA_SxCR_MINC |
+    //                       0x1U << DMA_SxCR_PSIZE_Pos |
+    //                       0x1U << DMA_SxCR_MSIZE_Pos;
     
-    ADC1_DMA_STREAM->NDTR = 2UL;
-    ADC1_DMA_STREAM->PAR = (uint32_t)&ADC1->DR;
-    ADC1_DMA_STREAM->M0AR = (uint32_t)adc_value;
+    // ADC1_DMA_STREAM->NDTR = 2UL;
+    // ADC1_DMA_STREAM->PAR = (uint32_t)&ADC1->DR;
+    // ADC1_DMA_STREAM->M0AR = (uint32_t)adc_value;
 
-    ADC1_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
-    ADC1_DMAMUX_CH->CCR |= ADC1_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
+    // ADC1_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
+    // ADC1_DMAMUX_CH->CCR |= ADC1_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
 
-    ADC1_DMA_STREAM->CR |= DMA_SxCR_EN;
+    // ADC1_DMA_STREAM->CR |= DMA_SxCR_EN;
     // ====================================================================================================
     RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
 
@@ -195,22 +196,45 @@ int main(void)
     ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
     ADC1->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_3;
 
-    ADC1->CFGR |= 0x3U << ADC_CFGR_DMNGT_Pos |
+    ADC1->CFGR |= 0x2U << ADC_CFGR_DMNGT_Pos |
                   0x5U << ADC_CFGR_RES_Pos |
                   ADC_CFGR_OVRMOD |
-                  ADC_CFGR_CONT |
-                  ADC_CFGR_OVRMOD;
+                  ADC_CFGR_CONT;
 
     // TODO configure ADC channels, sampling time, etc.
-    ADC1->SQR1 = 0x1U;
+    ADC1->SQR1 = 0x0U;
     ADC1->SQR1 |= (2UL << ADC_SQR1_SQ1_Pos);
-    ADC1->SQR1 |= (3UL << ADC_SQR1_SQ2_Pos);
+    // ADC1->SQR1 |= (3UL << ADC_SQR1_SQ2_Pos);
 
     ADC1->SMPR1 = 0x0U;
     ADC1->SMPR1 |= (0x7UL << ADC_SMPR1_SMP2_Pos);
-    ADC1->SMPR1 |= (0x7UL << ADC_SMPR1_SMP3_Pos);
+    // ADC1->SMPR1 |= (0x7UL << ADC_SMPR1_SMP3_Pos);
+
+    RCC->APB2ENR |= RCC_APB2ENR_DFSDM1EN;
+
+    DFSDM1_Channel0->CHCFGR1 &= ~DFSDM_CHCFGR1_CHEN;
+    DFSDM1_Channel0->CHCFGR2 &= ~DFSDM_CHCFGR2_DTRBS_Msk;
+    DFSDM1_Channel0->CHCFGR2 |= (10UL << DFSDM_CHCFGR2_DTRBS_Pos);
+    DFSDM1_Channel0->CHCFGR1 &= ~DFSDM_CHCFGR1_DATMPX;
+    DFSDM1_Channel0->CHCFGR1 |= (1UL << DFSDM_CHCFGR1_DATMPX_Pos);
+    DFSDM1_Channel0->CHCFGR1 |= DFSDM_CHCFGR1_CHEN;
+
+    DFSDM1_Filter0->FLTCR1 &= ~DFSDM_FLTCR1_DFEN;
+    DFSDM1_Filter0->FLTCR1 &= ~DFSDM_FLTCR1_RCH;
+    DFSDM1_Filter0->FLTCR1 |= (0UL << DFSDM_FLTCR1_RCH_Pos);
+
+    DFSDM1_Filter0->FLTCR1 |= DFSDM_FLTCR1_RCONT;
+
+    DFSDM1_Filter0->FLTFCR = (0UL << DFSDM_FLTFCR_FORD_Pos) |   // Sinc3, check exact encoding in header/RM
+                             ((32UL - 1UL) << DFSDM_FLTFCR_FOSR_Pos) |
+                             ((1UL  - 1UL) << DFSDM_FLTFCR_IOSR_Pos);
+
+    DFSDM1_Filter0->FLTCR1 |= DFSDM_FLTCR1_DFEN;
+    DFSDM1_Channel0->CHCFGR1 |= DFSDM_CHCFGR1_DFSDMEN;
 
     ADC1->CR |= ADC_CR_ADSTART;
+
+    DFSDM1_Filter0->FLTCR1 |= DFSDM_FLTCR1_RSWSTART;
 
 	for(;;)
     {
@@ -218,6 +242,10 @@ int main(void)
         // {
         //     adc_value = ADC1->DR;
         // }
+        if (DFSDM1_Filter0->FLTISR & DFSDM_FLTISR_REOCF)
+        {
+            dfsdm_value = (int32_t)DFSDM1_Filter0->FLTRDATAR >> 8;
+        }
     }
 }
 
