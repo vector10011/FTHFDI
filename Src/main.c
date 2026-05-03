@@ -196,6 +196,7 @@ int main(void)
     ADC1->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_3;
 
     ADC1->CFGR |= 0x3U << ADC_CFGR_DMNGT_Pos |
+                  0x5U << ADC_CFGR_RES_Pos |
                   ADC_CFGR_OVRMOD |
                   ADC_CFGR_CONT |
                   ADC_CFGR_OVRMOD;
