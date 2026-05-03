@@ -35,6 +35,8 @@
 #define                 ADC1_INP3_PORT                                  GPIOA
 #define                 ADC1_INP3_PIN                                   6UL
 
+volatile uint32_t adc_value;
+
 int main(void)
 {
     // ====================================================================================================
@@ -125,6 +127,8 @@ int main(void)
 
     BUTTON_USER_PORT->MODER &= ~(0x3UL << (BUTTON_USER_PIN * 2));
     // ====================================================================================================
+    
+    // ====================================================================================================
     RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
 
     ADC1_INP2_PORT->MODER &= ~(0x3UL << (ADC1_INP2_PIN * 2));
@@ -137,8 +141,16 @@ int main(void)
 
     RCC->AHB1ENR |= RCC_AHB1ENR_ADC12EN;
 
+    // RCC->APB4ENR |= RCC_APB4ENR_VREFEN;
+    // VREFBUF->CSR &= ~VREFBUF_CSR_HIZ;
+    // VREFBUF->CSR |= VREFBUF_CSR_ENVR;
+    // while(!(VREFBUF->CSR & VREFBUF_CSR_VRR)) __NOP();
+
     ADC12_COMMON->CCR &= ~(ADC_CCR_CKMODE | ADC_CCR_PRESC);
-    ADC12_COMMON->CCR |= 0x1UL << ADC_CCR_CKMODE;
+    ADC12_COMMON->CCR |= 0x3UL << ADC_CCR_CKMODE_Pos;
+    
+    ADC1->CR &= ~ADC_CR_BOOST;
+    ADC1->CR |= (0x3UL << ADC_CR_BOOST_Pos); // BOOST = 11
 
     ADC1->CR &= ~ADC_CR_DEEPPWD;
     ADC1->CR |= ADC_CR_ADVREGEN;
@@ -148,7 +160,7 @@ int main(void)
     ADC1->CR &= ~ADC_CR_ADEN;
 
     ADC1->CR &= ~ADC_CR_ADCALDIF;
-    ADC1->CR |= ADC_CR_ADCALLIN;
+    // ADC1->CR |= ADC_CR_ADCALLIN;
     ADC1->CR |= ADC_CR_ADCAL;
     while(ADC1->CR & ADC_CR_ADCAL) __NOP();
 
@@ -157,13 +169,27 @@ int main(void)
     while (!(ADC1->ISR & ADC_ISR_ADRDY)) __NOP();
 
     ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_2;
+    ADC1->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_2;
     // ADC1->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
 
     ADC1->CFGR |= ADC_CFGR_CONT | ADC_CFGR_OVRMOD;
 
     // TODO configure ADC channels, sampling time, etc.
+    ADC1->SQR1 = 0x0U;
+    ADC1->SQR1 |= (2UL << ADC_SQR1_SQ1_Pos);
+    // ADC1->SQR1 |= (3UL << ADC_SQR1_SQ1_Pos);
 
-	for(;;);
+    ADC1->CFGR |= ADC_CFGR_CONT;
+
+    ADC1->CR |= ADC_CR_ADSTART;
+
+	for(;;)
+    {
+        if (ADC1->ISR & ADC_ISR_EOC)
+        {
+            adc_value = ADC1->DR;
+        }
+    }
 }
 
 void TIM6_DAC_IRQHandler(void)
