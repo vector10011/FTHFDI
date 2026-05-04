@@ -18,6 +18,9 @@
 
 #include <stdint.h>
 #include "stm32h723xx.h"
+#include "rcc_cfg.h"
+#include "adc_cfg.h"
+
 
 #define                 LED_GREEN_PORT                                  GPIOB
 #define                 LED_GREEN_PIN                                   0UL
@@ -35,95 +38,57 @@
 #define                 TIM_REF_IRQn                                    TIM7_IRQn
 #define                 TIM_REF_IRQHandler                              TIM7_IRQHandler
 
-#define                 ADC1_INP2_PORT                                  GPIOF
-#define                 ADC1_INP2_PIN                                   11UL
+// #define                 ADC1_INP2_PORT                                  GPIOF
+// #define                 ADC1_INP2_PIN                                   11UL
 
-#define                 ADC1_INP3_PORT                                  GPIOA
-#define                 ADC1_INP3_PIN                                   6UL
+// #define                 ADC1_INP3_PORT                                  GPIOA
+// #define                 ADC1_INP3_PIN                                   6UL
 
-#define                 ADC1_DMAMUX_INPUT                               9UL
-#define                 ADC1_DMAMUX_CH                                  DMAMUX1_Channel4
-#define                 ADC1_DMA                                        DMA1
-#define                 ADC1_DMA_STREAM                                 DMA1_Stream4
+// #define                 ADC1_DMAMUX_INPUT                               9UL
+// #define                 ADC1_DMAMUX_CH                                  DMAMUX1_Channel4
+// #define                 ADC1_DMA                                        DMA1
+// #define                 ADC1_DMA_STREAM                                 DMA1_Stream4
 
-#define                 CURRENT_SENSOR_PORT                             ADC1_INP2_PORT
-#define                 CURRENT_SENSOR_PIN                              ADC1_INP2_PIN
+// #define                 CURRENT_SENSOR_PORT                             ADC1_INP2_PORT
+// #define                 CURRENT_SENSOR_PIN                              ADC1_INP2_PIN
 
-#define                 VOLTAGE_SENSOR_PORT                             ADC1_INP3_PORT
-#define                 VOLTAGE_SENSOR_PIN                              ADC1_INP3_PIN
+// #define                 VOLTAGE_SENSOR_PORT                             ADC1_INP3_PORT
+// #define                 VOLTAGE_SENSOR_PIN                              ADC1_INP3_PIN
 
-#define                 SENSORS_ADC                                     ADC1
-#define                 SENSORS_DMAMUX_INPUT                            ADC1_DMAMUX_INPUT
-#define                 SENSORS_DMAMUX_CH                               ADC1_DMAMUX_CH
-#define                 SENSORS_DMA                                     ADC1_DMA
-#define                 SENSORS_DMA_STREAM                              ADC1_DMA_STREAM
+// #define                 SENSORS_ADC                                     ADC1
+// #define                 SENSORS_DMAMUX_INPUT                            ADC1_DMAMUX_INPUT
+// #define                 SENSORS_DMAMUX_CH                               ADC1_DMAMUX_CH
+// #define                 SENSORS_DMA                                     ADC1_DMA
+// #define                 SENSORS_DMA_STREAM                              ADC1_DMA_STREAM
 
-volatile uint16_t adc_value[2];
+#define                 DESC_TIM                                        TIM6
+#define                 DESC_TIM_PSC                                    25UL - 1UL
+#define                 DESC_TIM_ARR                                    10000UL - 1UL
+#define                 DESC_TIM_IRQn                                   TIM6_DAC_IRQn
+#define                 DESC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
+
+volatile uint16_t adc_value;
+volatile uint32_t conversion_time = 0;
+volatile uint32_t transfer_time = 0;
 
 int main(void)
 {
     // ====================================================================================================
     PWR->CR3 |= PWR_CR3_LDOEN;
-    while(!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY));
+    while(!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY))  __NOP();
     PWR->D3CR &= ~PWR_D3CR_VOS;
-    while(!(PWR->D3CR & PWR_D3CR_VOSRDY));
+    while(!(PWR->D3CR & PWR_D3CR_VOSRDY))  __NOP();
     // ====================================================================================================
     FLASH->ACR &= ~(FLASH_ACR_LATENCY | FLASH_ACR_WRHIGHFREQ);
     FLASH->ACR |= FLASH_ACR_LATENCY_3WS | (0x3U << FLASH_ACR_WRHIGHFREQ_Pos);
     // ====================================================================================================
-    RCC->CR |= RCC_CR_HSEON | RCC_CR_HSEBYP;
-    while(!(RCC->CR & RCC_CR_HSERDY));
-
-    RCC->PLLCKSELR &= ~(RCC_PLLCKSELR_DIVM1 | RCC_PLLCKSELR_PLLSRC);
-    RCC->PLLCKSELR |= 0x2UL << RCC_PLLCKSELR_PLLSRC_Pos |
-                      4UL << RCC_PLLCKSELR_DIVM1_Pos;
-
-    RCC->PLLCFGR &= ~(RCC_PLLCFGR_PLL1FRACEN | RCC_PLLCFGR_PLL1VCOSEL | RCC_PLLCFGR_PLL1RGE | RCC_PLLCFGR_DIVQ1EN | RCC_PLLCFGR_DIVR1EN);
-    RCC->PLLCFGR |= RCC_PLLCFGR_PLL1RGE_1 | RCC_PLLCFGR_DIVP1EN;
-
-    RCC->PLL1DIVR = 0x0U;
-    RCC->PLL1DIVR |= ((275UL - 1UL) << RCC_PLL1DIVR_N1_Pos) |
-                     ((1UL - 1UL) << RCC_PLL1DIVR_P1_Pos) |
-                     RCC_PLL1DIVR_Q1 |
-                     RCC_PLL1DIVR_R1;
-
-    RCC->D1CFGR &= ~(RCC_D1CFGR_HPRE | RCC_D1CFGR_D1PPRE | RCC_D1CFGR_D1CPRE);
-    RCC->D1CFGR |= 0x8UL << RCC_D1CFGR_HPRE_Pos |
-                   0x4UL << RCC_D1CFGR_D1PPRE_Pos |
-                   0x0UL << RCC_D1CFGR_D1CPRE_Pos;
-
-    RCC->D2CFGR &= ~(RCC_D2CFGR_D2PPRE1 | RCC_D2CFGR_D2PPRE2);
-    RCC->D2CFGR |= 0x4UL << RCC_D2CFGR_D2PPRE1_Pos |
-                   0x4UL << RCC_D2CFGR_D2PPRE2_Pos;
-
-    RCC->D3CFGR &= ~(RCC_D3CFGR_D3PPRE);
-    RCC->D3CFGR |= 0x4UL << RCC_D3CFGR_D3PPRE_Pos;
-
-    RCC->CR |= RCC_CR_PLL1ON;
-    while(!(RCC->CR & RCC_CR_PLL1RDY));
-    RCC->CFGR &= ~RCC_CFGR_SW;
-    RCC->CFGR |= RCC_CFGR_SW_PLL1;
-    while((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL1);
-    // ====================================================================================================
-    // PLL2 for ADC
-    // RCC->PLLCKSELR &= ~RCC_PLLCKSELR_DIVM2;
-    // RCC->PLLCKSELR |= 4UL << RCC_PLLCKSELR_DIVM2_Pos;
-
-    // RCC->PLLCFGR &= ~(RCC_PLLCFGR_PLL2FRACEN | RCC_PLLCFGR_PLL2VCOSEL | RCC_PLLCFGR_PLL2RGE | RCC_PLLCFGR_DIVQ2EN | RCC_PLLCFGR_DIVR2EN);
-    // RCC->PLLCFGR |= RCC_PLLCFGR_PLL2RGE_1 | RCC_PLLCFGR_DIVP2EN;
-
-    // RCC->PLL2DIVR = 0x0U;
-    // RCC->PLL2DIVR |= ((320UL - 1UL) << RCC_PLL2DIVR_N2_Pos) |
-    //                  ((1UL - 1UL) << RCC_PLL2DIVR_P2_Pos) |
-    //                  RCC_PLL2DIVR_Q2 |
-    //                  RCC_PLL2DIVR_R2;
-
-    // RCC->CR |= RCC_CR_PLL2ON;
-    // while(!(RCC->CR & RCC_CR_PLL2RDY));
+    rcc_init();
+    pll2_init();
     // ====================================================================================================
     SCB->CPACR |= ((3UL << 10 * 2) | (3UL << 11 * 2));
     // ====================================================================================================
     RCC->APB1LENR |= RCC_APB1LENR_TIM7EN;
+    (void)RCC->APB1LENR;
     TIM_REF->PSC = TIM_REF_PSC;
     TIM_REF->ARR = TIM_REF_ARR;
     TIM_REF->CR1 |= TIM_CR1_ARPE;
@@ -158,84 +123,104 @@ int main(void)
 
     BUTTON_USER_PORT->MODER &= ~(0x3UL << (BUTTON_USER_PIN * 2));
     // ====================================================================================================
+    cur_sen_adc_init();
+
     // DMA configuration for ADC1
 
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-    SENSORS_DMA_STREAM->CR &= ~DMA_SxCR_EN;
-    SENSORS_DMA_STREAM->CR = 0x0U << DMA_SxCR_DIR_Pos |
-                              DMA_SxCR_CIRC |
-                              DMA_SxCR_MINC |
-                              0x1U << DMA_SxCR_PSIZE_Pos |
-                              0x1U << DMA_SxCR_MSIZE_Pos;
+    // RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    // SENSORS_DMA_STREAM->CR &= ~DMA_SxCR_EN;
+    // SENSORS_DMA_STREAM->CR = 0x0U << DMA_SxCR_DIR_Pos |
+    //                           DMA_SxCR_CIRC |
+    //                           DMA_SxCR_MINC |
+    //                           0x1U << DMA_SxCR_PSIZE_Pos |
+    //                           0x1U << DMA_SxCR_MSIZE_Pos;
+
+    // SENSORS_DMA_STREAM->CR |= DMA_SxCR_TCIE;
     
-    SENSORS_DMA_STREAM->NDTR = 2UL;
-    SENSORS_DMA_STREAM->PAR = (uint32_t)&SENSORS_ADC->DR;
-    SENSORS_DMA_STREAM->M0AR = (uint32_t)adc_value;
+    // SENSORS_DMA_STREAM->NDTR = 1UL;
+    // SENSORS_DMA_STREAM->PAR = (uint32_t)&SENSORS_ADC->DR;
+    // SENSORS_DMA_STREAM->M0AR = (uint32_t)&adc_value;
 
-    SENSORS_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
-    SENSORS_DMAMUX_CH->CCR |= SENSORS_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
+    // SENSORS_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
+    // SENSORS_DMAMUX_CH->CCR |= SENSORS_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
 
-    SENSORS_DMA_STREAM->CR |= DMA_SxCR_EN;
+    // NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+
+    // SENSORS_DMA_STREAM->CR |= DMA_SxCR_EN;
+    // // ====================================================================================================
+    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
+
+    // CURRENT_SENSOR_PORT->MODER &= ~(0x3UL << (ADC1_INP2_PIN * 2));
+    // CURRENT_SENSOR_PORT->MODER |= 0x3UL << (ADC1_INP2_PIN * 2);
+
+    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;
+
+    // VOLTAGE_SENSOR_PORT->MODER &= ~(0x3UL << (ADC1_INP3_PIN * 2));
+    // VOLTAGE_SENSOR_PORT->MODER |= 0x3UL << (ADC1_INP3_PIN * 2);
+
+    // RCC->AHB1ENR |= RCC_AHB1ENR_ADC12EN;
+
+    // // RCC->APB4ENR |= RCC_APB4ENR_VREFEN;
+    // // VREFBUF->CSR &= ~VREFBUF_CSR_HIZ;
+    // // VREFBUF->CSR |= VREFBUF_CSR_ENVR;
+    // // while(!(VREFBUF->CSR & VREFBUF_CSR_VRR)) __NOP();
+
+    // ADC12_COMMON->CCR &= ~(ADC_CCR_CKMODE | ADC_CCR_PRESC);
+    // // ADC12_COMMON->CCR |= 0x3UL << ADC_CCR_CKMODE_Pos;
+    
+    // SENSORS_ADC->CR &= ~ADC_CR_BOOST;
+    // SENSORS_ADC->CR |= (0x3UL << ADC_CR_BOOST_Pos); // BOOST = 11
+
+    // SENSORS_ADC->CR &= ~ADC_CR_DEEPPWD;
+    // SENSORS_ADC->CR |= ADC_CR_ADVREGEN;
+    // // for(uint32_t n = 0; n < 10000; n++) __NOP();
+    // while(!(SENSORS_ADC->ISR & ADC_ISR_LDORDY)) __NOP();
+
+    // SENSORS_ADC->CR &= ~ADC_CR_ADEN;
+
+    // SENSORS_ADC->CR &= ~ADC_CR_ADCALDIF;
+    // SENSORS_ADC->CR |= ADC_CR_ADCALLIN;
+    // SENSORS_ADC->CR |= ADC_CR_ADCAL;
+    // while(SENSORS_ADC->CR & ADC_CR_ADCAL) __NOP();
+
+    // SENSORS_ADC->ISR |= ADC_ISR_ADRDY;
+    // SENSORS_ADC->CR  |= ADC_CR_ADEN;
+    // while (!(SENSORS_ADC->ISR & ADC_ISR_ADRDY)) __NOP();
+
+    // SENSORS_ADC->PCSEL_RES0 |= ADC_PCSEL_PCSEL_2;
+    // SENSORS_ADC->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_2;
+    // // SENSORS_ADC->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
+    // // SENSORS_ADC->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_3;
+
+    // SENSORS_ADC->CFGR |= 0x3U << ADC_CFGR_DMNGT_Pos |
+    //                      0x5U << ADC_CFGR_RES_Pos |
+    //                      ADC_CFGR_OVRMOD;
+
+    // SENSORS_ADC->CFGR |= 13U << ADC_CFGR_EXTSEL_Pos |
+    //                      ADC_CFGR_EXTEN_0;
+
+    // SENSORS_ADC->IER |= ADC_IER_EOSIE;
+    // NVIC_EnableIRQ(ADC_IRQn);
+    
+    // SENSORS_ADC->SQR1 = 0x0U;
+    // SENSORS_ADC->SQR1 |= (2UL << ADC_SQR1_SQ1_Pos);
+    // // SENSORS_ADC->SQR1 |= (3UL << ADC_SQR1_SQ2_Pos);
+
+    // SENSORS_ADC->SMPR1 = 0x0U;
+    // SENSORS_ADC->SMPR1 |= (0x1UL << ADC_SMPR1_SMP2_Pos);
+    // // SENSORS_ADC->SMPR1 |= (0x1UL << ADC_SMPR1_SMP3_Pos);
+
+    // SENSORS_ADC->CR |= ADC_CR_ADSTART;
+
     // ====================================================================================================
-    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
-
-    CURRENT_SENSOR_PORT->MODER &= ~(0x3UL << (ADC1_INP2_PIN * 2));
-    CURRENT_SENSOR_PORT->MODER |= 0x3UL << (ADC1_INP2_PIN * 2);
-
-    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;
-
-    VOLTAGE_SENSOR_PORT->MODER &= ~(0x3UL << (ADC1_INP3_PIN * 2));
-    VOLTAGE_SENSOR_PORT->MODER |= 0x3UL << (ADC1_INP3_PIN * 2);
-
-    RCC->AHB1ENR |= RCC_AHB1ENR_ADC12EN;
-
-    // RCC->APB4ENR |= RCC_APB4ENR_VREFEN;
-    // VREFBUF->CSR &= ~VREFBUF_CSR_HIZ;
-    // VREFBUF->CSR |= VREFBUF_CSR_ENVR;
-    // while(!(VREFBUF->CSR & VREFBUF_CSR_VRR)) __NOP();
-
-    ADC12_COMMON->CCR &= ~(ADC_CCR_CKMODE | ADC_CCR_PRESC);
-    ADC12_COMMON->CCR |= 0x3UL << ADC_CCR_CKMODE_Pos;
-    
-    SENSORS_ADC->CR &= ~ADC_CR_BOOST;
-    SENSORS_ADC->CR |= (0x3UL << ADC_CR_BOOST_Pos); // BOOST = 11
-
-    SENSORS_ADC->CR &= ~ADC_CR_DEEPPWD;
-    SENSORS_ADC->CR |= ADC_CR_ADVREGEN;
-    // for(uint32_t n = 0; n < 10000; n++) __NOP();
-    while(!(SENSORS_ADC->ISR & ADC_ISR_LDORDY)) __NOP();
-
-    SENSORS_ADC->CR &= ~ADC_CR_ADEN;
-
-    SENSORS_ADC->CR &= ~ADC_CR_ADCALDIF;
-    SENSORS_ADC->CR |= ADC_CR_ADCALLIN;
-    SENSORS_ADC->CR |= ADC_CR_ADCAL;
-    while(SENSORS_ADC->CR & ADC_CR_ADCAL) __NOP();
-
-    SENSORS_ADC->ISR |= ADC_ISR_ADRDY;
-    SENSORS_ADC->CR  |= ADC_CR_ADEN;
-    while (!(SENSORS_ADC->ISR & ADC_ISR_ADRDY)) __NOP();
-
-    SENSORS_ADC->PCSEL_RES0 |= ADC_PCSEL_PCSEL_2;
-    SENSORS_ADC->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_2;
-    SENSORS_ADC->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
-    SENSORS_ADC->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_3;
-
-    SENSORS_ADC->CFGR |= 0x3U << ADC_CFGR_DMNGT_Pos |
-                         0x5U << ADC_CFGR_RES_Pos |
-                         ADC_CFGR_OVRMOD |
-                         ADC_CFGR_CONT;
-
-    // TODO configure ADC channels, sampling time, etc.
-    SENSORS_ADC->SQR1 = 0x1U;
-    SENSORS_ADC->SQR1 |= (2UL << ADC_SQR1_SQ1_Pos);
-    SENSORS_ADC->SQR1 |= (3UL << ADC_SQR1_SQ2_Pos);
-
-    SENSORS_ADC->SMPR1 = 0x0U;
-    SENSORS_ADC->SMPR1 |= (0x7UL << ADC_SMPR1_SMP2_Pos);
-    SENSORS_ADC->SMPR1 |= (0x7UL << ADC_SMPR1_SMP3_Pos);
-
-    SENSORS_ADC->CR |= ADC_CR_ADSTART;
+    RCC->APB1LENR |= RCC_APB1LENR_TIM6EN;
+    DESC_TIM->PSC = DESC_TIM_PSC;
+    DESC_TIM->ARR = DESC_TIM_ARR;
+    DESC_TIM->CR1 |= TIM_CR1_ARPE;
+    DESC_TIM->CR2 = 2UL << TIM_CR2_MMS_Pos; // Update event as TRGO
+    DESC_TIM->DIER |= TIM_DIER_UIE;
+    // NVIC_EnableIRQ(DESC_TIM_IRQn);
+    DESC_TIM->CR1 |= TIM_CR1_CEN;
 
 	for(;;)
     {
@@ -243,6 +228,14 @@ int main(void)
         // {
         //     adc_value = SENSORS_ADC->DR;
         // }
+        if (BUTTON_USER_PORT->IDR & (1UL << BUTTON_USER_PIN))
+        {
+            LED_RED_PORT->ODR |= 1UL << LED_RED_PIN;
+        }
+        else
+        {
+            LED_RED_PORT->ODR &= ~(1UL << LED_RED_PIN);
+        }
     }
 }
 
@@ -253,5 +246,23 @@ void TIM_REF_IRQHandler(void)
         TIM_REF->SR &= ~TIM_SR_UIF;
         
         LED_GREEN_PORT->ODR ^= 1UL << LED_GREEN_PIN;
+    }
+}
+
+void CUR_SEN_ADC_IRQHandler(void)
+{
+    if(CUR_SEN_ADC->ISR & ADC_ISR_EOS)
+    {
+        CUR_SEN_ADC->ISR |= ADC_ISR_EOS;
+        conversion_time = DESC_TIM->CNT;
+    }
+}
+
+void CUR_SEN_DMA_STREAM_IRQHandler(void)
+{
+    if(CUR_SEN_DMA->HISR & DMA_HISR_TCIF4)
+    {
+        CUR_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF4;
+        transfer_time = DESC_TIM->CNT;
     }
 }

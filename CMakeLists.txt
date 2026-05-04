@@ -43,6 +43,8 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/rcc_cfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/adc_cfg.c
 )
 
 # Include directories for all compilers
