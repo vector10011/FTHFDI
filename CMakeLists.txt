@@ -101,6 +101,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:ASM>: ${include_asm_DIRS}>
     external/cmsis-core/CMSIS/Core/Include
     external/cmsis-device/Include
+    external/cmsis-dsp/Include
 )
 
 # Add project symbols (macros)

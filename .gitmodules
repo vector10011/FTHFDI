@@ -4,3 +4,6 @@
 [submodule "external/cmsis-core"]
 	path = external/cmsis-core
 	url = https://github.com/ARM-software/CMSIS_6.git
+[submodule "external/cmsis-dsp"]
+	path = external/cmsis-dsp
+	url = https://github.com/ARM-software/CMSIS-DSP.git
