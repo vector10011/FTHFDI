@@ -62,8 +62,8 @@
 // #define                 SENSORS_DMA_STREAM                              ADC1_DMA_STREAM
 
 #define                 DESC_TIM                                        TIM6
-#define                 DESC_TIM_PSC                                    1UL - 1UL
-#define                 DESC_TIM_ARR                                    275UL - 1UL
+#define                 DESC_TIM_PSC                                    25UL - 1UL
+#define                 DESC_TIM_ARR                                    11UL - 1UL
 #define                 DESC_TIM_IRQn                                   TIM6_DAC_IRQn
 #define                 DESC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
 
@@ -240,6 +240,30 @@ int main(void)
         {
             LED_RED_PORT->ODR &= ~(1UL << LED_RED_PIN);
         }
+
+        if(CUR_SEN_ADC->ISR & ADC_ISR_EOC)
+        {
+            CUR_SEN_ADC->ISR |= ADC_ISR_EOC;
+            cur_conv_time = DESC_TIM->CNT;
+        }
+
+        // if(CUR_SEN_DMA->HISR & DMA_HISR_TCIF4)
+        // {
+        //     CUR_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF4;
+        //     cur_tran_time = DESC_TIM->CNT;
+        // }
+
+        if(VOL_SEN_ADC->ISR & ADC_ISR_EOC)
+        {
+            VOL_SEN_ADC->ISR |= ADC_ISR_EOC;
+            vol_conv_time = DESC_TIM->CNT;
+        }
+
+        // if(VOL_SEN_DMA->HISR & DMA_HISR_TCIF5)
+        // {
+        //     VOL_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF5;
+        //     vol_tran_time = DESC_TIM->CNT;
+        // }
     }
 }
 

@@ -26,8 +26,8 @@ void cur_sen_adc_init(void)
     CUR_SEN_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
     CUR_SEN_DMAMUX_CH->CCR |= CUR_SEN_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
 
-    CUR_SEN_DMA_STREAM->CR |= DMA_SxCR_TCIE;
-    NVIC_EnableIRQ(CUR_SEN_DMA_STREAM_IRQn);
+    // CUR_SEN_DMA_STREAM->CR |= DMA_SxCR_TCIE;
+    // NVIC_EnableIRQ(CUR_SEN_DMA_STREAM_IRQn);
 
     CUR_SEN_DMA_STREAM->CR |= DMA_SxCR_EN;
     // ====================================================================================================
@@ -72,8 +72,8 @@ void cur_sen_adc_init(void)
     CUR_SEN_ADC->SMPR1 = 0x0U;
     CUR_SEN_ADC->SMPR1 |= (0x1UL << ADC_SMPR1_SMP2_Pos);
 
-    CUR_SEN_ADC->IER |= ADC_IER_EOSIE;
-    NVIC_EnableIRQ(CUR_SEN_ADC_IRQn);
+    // CUR_SEN_ADC->IER |= ADC_IER_EOSIE;
+    // NVIC_EnableIRQ(CUR_SEN_ADC_IRQn);
 
     CUR_SEN_ADC->CR |= ADC_CR_ADSTART;
 }
@@ -101,8 +101,8 @@ void vol_sen_adc_init(void)
     VOL_SEN_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
     VOL_SEN_DMAMUX_CH->CCR |= VOL_SEN_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
 
-    VOL_SEN_DMA_STREAM->CR |= DMA_SxCR_TCIE;
-    NVIC_EnableIRQ(VOL_SEN_DMA_STREAM_IRQn);
+    // VOL_SEN_DMA_STREAM->CR |= DMA_SxCR_TCIE;
+    // NVIC_EnableIRQ(VOL_SEN_DMA_STREAM_IRQn);
 
     VOL_SEN_DMA_STREAM->CR |= DMA_SxCR_EN;
     // ====================================================================================================
@@ -147,8 +147,8 @@ void vol_sen_adc_init(void)
     VOL_SEN_ADC->SMPR1 = 0x0U;
     VOL_SEN_ADC->SMPR1 |= (0x1UL << ADC_SMPR1_SMP2_Pos);
 
-    VOL_SEN_ADC->IER |= ADC_IER_EOSIE;
-    NVIC_EnableIRQ(VOL_SEN_ADC_IRQn);
+    // VOL_SEN_ADC->IER |= ADC_IER_EOSIE;
+    // NVIC_EnableIRQ(VOL_SEN_ADC_IRQn);
 
     VOL_SEN_ADC->CR |= ADC_CR_ADSTART;
 }
