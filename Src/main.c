@@ -62,14 +62,17 @@
 // #define                 SENSORS_DMA_STREAM                              ADC1_DMA_STREAM
 
 #define                 DESC_TIM                                        TIM6
-#define                 DESC_TIM_PSC                                    25UL - 1UL
-#define                 DESC_TIM_ARR                                    10000UL - 1UL
+#define                 DESC_TIM_PSC                                    1UL - 1UL
+#define                 DESC_TIM_ARR                                    275UL - 1UL
 #define                 DESC_TIM_IRQn                                   TIM6_DAC_IRQn
 #define                 DESC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
 
-volatile uint16_t adc_value;
-volatile uint32_t conversion_time = 0;
-volatile uint32_t transfer_time = 0;
+volatile uint32_t cur_conv_time = 0;
+volatile uint32_t cur_tran_time = 0;
+
+volatile uint32_t vol_conv_time = 0;
+volatile uint32_t vol_tran_time = 0;
+
 
 int main(void)
 {
@@ -124,6 +127,7 @@ int main(void)
     BUTTON_USER_PORT->MODER &= ~(0x3UL << (BUTTON_USER_PIN * 2));
     // ====================================================================================================
     cur_sen_adc_init();
+    vol_sen_adc_init();
 
     // DMA configuration for ADC1
 
@@ -254,7 +258,7 @@ void CUR_SEN_ADC_IRQHandler(void)
     if(CUR_SEN_ADC->ISR & ADC_ISR_EOS)
     {
         CUR_SEN_ADC->ISR |= ADC_ISR_EOS;
-        conversion_time = DESC_TIM->CNT;
+        cur_conv_time = DESC_TIM->CNT;
     }
 }
 
@@ -263,6 +267,24 @@ void CUR_SEN_DMA_STREAM_IRQHandler(void)
     if(CUR_SEN_DMA->HISR & DMA_HISR_TCIF4)
     {
         CUR_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF4;
-        transfer_time = DESC_TIM->CNT;
+        cur_tran_time = DESC_TIM->CNT;
+    }
+}
+
+void VOL_SEN_ADC_IRQHandler(void)
+{
+    if(VOL_SEN_ADC->ISR & ADC_ISR_EOS)
+    {
+        VOL_SEN_ADC->ISR |= ADC_ISR_EOS;
+        vol_conv_time = DESC_TIM->CNT;
+    }
+}
+
+void VOL_SEN_DMA_STREAM_IRQHandler(void)
+{
+    if(VOL_SEN_DMA->HISR & DMA_HISR_TCIF5)
+    {
+        VOL_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF5;
+        vol_tran_time = DESC_TIM->CNT;
     }
 }

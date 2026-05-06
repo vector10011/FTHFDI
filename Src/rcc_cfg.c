@@ -6,7 +6,7 @@ void rcc_init(void)
     while(!(RCC->CR & RCC_CR_HSERDY)) __NOP();
 
     RCC->PLLCKSELR &= ~(RCC_PLLCKSELR_DIVM1 | RCC_PLLCKSELR_PLLSRC);
-    RCC->PLLCKSELR |= 0x2UL << RCC_PLLCKSELR_PLLSRC_Pos |
+    RCC->PLLCKSELR |= RCC_PLLCKSELR_PLLSRC_HSE |
                       PLL1_M << RCC_PLLCKSELR_DIVM1_Pos;
 
     RCC->PLLCFGR &= ~(RCC_PLLCFGR_PLL1FRACEN | RCC_PLLCFGR_PLL1VCOSEL | RCC_PLLCFGR_PLL1RGE | RCC_PLLCFGR_DIVQ1EN | RCC_PLLCFGR_DIVR1EN);
@@ -14,9 +14,7 @@ void rcc_init(void)
 
     RCC->PLL1DIVR = 0x0U;
     RCC->PLL1DIVR |= ((PLL1_N - 1UL) << RCC_PLL1DIVR_N1_Pos) |
-                     ((PLL1_P - 1UL) << RCC_PLL1DIVR_P1_Pos) |
-                     RCC_PLL1DIVR_Q1 |
-                     RCC_PLL1DIVR_R1;
+                     ((PLL1_P - 1UL) << RCC_PLL1DIVR_P1_Pos);
 
     RCC->D1CFGR &= ~(RCC_D1CFGR_HPRE | RCC_D1CFGR_D1PPRE | RCC_D1CFGR_D1CPRE);
     RCC->D1CFGR |= HPRE |
@@ -47,9 +45,7 @@ void pll2_init(void)
 
     RCC->PLL2DIVR = 0x0U;
     RCC->PLL2DIVR |= ((PLL2_N - 1UL) << RCC_PLL2DIVR_N2_Pos) |
-                     ((PLL2_P - 1UL) << RCC_PLL2DIVR_P2_Pos) |
-                     RCC_PLL2DIVR_Q2 |
-                     RCC_PLL2DIVR_R2;
+                     ((PLL2_P - 1UL) << RCC_PLL2DIVR_P2_Pos);
 
     RCC->CR |= RCC_CR_PLL2ON;
     while(!(RCC->CR & RCC_CR_PLL2RDY));

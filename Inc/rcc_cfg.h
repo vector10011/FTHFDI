@@ -1,6 +1,6 @@
 #include "stm32h723xx.h"
 
-#define                 HSE_FREQ                    8
+#define                 HSE_FREQ                    5
 
 #define                 PLL1_M                      1UL
 #define                 PLL1_N                      110UL
