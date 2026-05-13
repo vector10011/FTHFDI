@@ -20,6 +20,8 @@
 #include "stm32h723xx.h"
 #include "rcc_cfg.h"
 #include "adc_cfg.h"
+#include "usart_cfg.h"
+#include "nanoprintf.h"
 
 
 #define                 LED_GREEN_PORT                                  GPIOB
@@ -66,6 +68,12 @@
 #define                 DESC_TIM_ARR                                    11UL - 1UL
 #define                 DESC_TIM_IRQn                                   TIM6_DAC_IRQn
 #define                 DESC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
+
+typedef struct
+{
+    float current;
+    float voltage;
+} SensorData_t;
 
 volatile uint32_t cur_conv_time = 0;
 volatile uint32_t cur_tran_time = 0;
@@ -128,94 +136,32 @@ int main(void)
     // ====================================================================================================
     cur_sen_adc_init();
     vol_sen_adc_init();
-
-    // DMA configuration for ADC1
-
-    // RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-    // SENSORS_DMA_STREAM->CR &= ~DMA_SxCR_EN;
-    // SENSORS_DMA_STREAM->CR = 0x0U << DMA_SxCR_DIR_Pos |
-    //                           DMA_SxCR_CIRC |
-    //                           DMA_SxCR_MINC |
-    //                           0x1U << DMA_SxCR_PSIZE_Pos |
-    //                           0x1U << DMA_SxCR_MSIZE_Pos;
-
-    // SENSORS_DMA_STREAM->CR |= DMA_SxCR_TCIE;
+    // ====================================================================================================
+    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIODEN;
+    // GPIOD->MODER &= ~(0x3UL << (13UL * 2));
+    // GPIOD->MODER |= 0x2UL << (13UL * 2);
+    // GPIOD->AFR[13UL / 8] &= ~(0xFUL << ((13UL % 8) * 4));
+    // GPIOD->AFR[13UL / 8] |= 1UL << ((13UL % 8) * 4);
     
-    // SENSORS_DMA_STREAM->NDTR = 1UL;
-    // SENSORS_DMA_STREAM->PAR = (uint32_t)&SENSORS_ADC->DR;
-    // SENSORS_DMA_STREAM->M0AR = (uint32_t)&adc_value;
-
-    // SENSORS_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
-    // SENSORS_DMAMUX_CH->CCR |= SENSORS_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
-
-    // NVIC_EnableIRQ(DMA1_Stream4_IRQn);
-
-    // SENSORS_DMA_STREAM->CR |= DMA_SxCR_EN;
-    // // ====================================================================================================
-    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIOFEN;
-
-    // CURRENT_SENSOR_PORT->MODER &= ~(0x3UL << (ADC1_INP2_PIN * 2));
-    // CURRENT_SENSOR_PORT->MODER |= 0x3UL << (ADC1_INP2_PIN * 2);
-
-    // RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;
-
-    // VOLTAGE_SENSOR_PORT->MODER &= ~(0x3UL << (ADC1_INP3_PIN * 2));
-    // VOLTAGE_SENSOR_PORT->MODER |= 0x3UL << (ADC1_INP3_PIN * 2);
-
-    // RCC->AHB1ENR |= RCC_AHB1ENR_ADC12EN;
-
-    // // RCC->APB4ENR |= RCC_APB4ENR_VREFEN;
-    // // VREFBUF->CSR &= ~VREFBUF_CSR_HIZ;
-    // // VREFBUF->CSR |= VREFBUF_CSR_ENVR;
-    // // while(!(VREFBUF->CSR & VREFBUF_CSR_VRR)) __NOP();
-
-    // ADC12_COMMON->CCR &= ~(ADC_CCR_CKMODE | ADC_CCR_PRESC);
-    // // ADC12_COMMON->CCR |= 0x3UL << ADC_CCR_CKMODE_Pos;
+    RCC->CSR |= RCC_CSR_LSION;
+    while(!(RCC->CSR & RCC_CSR_LSIRDY))  __NOP();
     
-    // SENSORS_ADC->CR &= ~ADC_CR_BOOST;
-    // SENSORS_ADC->CR |= (0x3UL << ADC_CR_BOOST_Pos); // BOOST = 11
+    RCC->D2CCIP2R &= ~RCC_D2CCIP2R_LPTIM1SEL;
+    RCC->D2CCIP2R |= 0x4UL << RCC_D2CCIP2R_LPTIM1SEL_Pos;
 
-    // SENSORS_ADC->CR &= ~ADC_CR_DEEPPWD;
-    // SENSORS_ADC->CR |= ADC_CR_ADVREGEN;
-    // // for(uint32_t n = 0; n < 10000; n++) __NOP();
-    // while(!(SENSORS_ADC->ISR & ADC_ISR_LDORDY)) __NOP();
+    RCC->APB1LENR |= RCC_APB1LENR_LPTIM1EN;
+    LPTIM1->CFGR |= 0x5UL << LPTIM_CFGR_PRESC_Pos;
+    LPTIM1->CR |= LPTIM_CR_ENABLE;
+    LPTIM1->ARR = 1024UL - 1UL;
+    while(!(LPTIM1->ISR & LPTIM_ISR_ARROK))  __NOP();
+    LPTIM1->ICR = LPTIM_ICR_ARROKCF;
+    LPTIM1->CMP = LPTIM1->ARR / 2;
+    while(!(LPTIM1->ISR & LPTIM_ISR_CMPOK))  __NOP();
+    LPTIM1->ICR = LPTIM_ICR_CMPOKCF;
+    LPTIM1->ICR = LPTIM_ICR_ARRMCF | LPTIM_ICR_CMPMCF;
+    LPTIM1->CR |= LPTIM_CR_CNTSTRT;
 
-    // SENSORS_ADC->CR &= ~ADC_CR_ADEN;
-
-    // SENSORS_ADC->CR &= ~ADC_CR_ADCALDIF;
-    // SENSORS_ADC->CR |= ADC_CR_ADCALLIN;
-    // SENSORS_ADC->CR |= ADC_CR_ADCAL;
-    // while(SENSORS_ADC->CR & ADC_CR_ADCAL) __NOP();
-
-    // SENSORS_ADC->ISR |= ADC_ISR_ADRDY;
-    // SENSORS_ADC->CR  |= ADC_CR_ADEN;
-    // while (!(SENSORS_ADC->ISR & ADC_ISR_ADRDY)) __NOP();
-
-    // SENSORS_ADC->PCSEL_RES0 |= ADC_PCSEL_PCSEL_2;
-    // SENSORS_ADC->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_2;
-    // // SENSORS_ADC->PCSEL_RES0 |= ADC_PCSEL_PCSEL_3;
-    // // SENSORS_ADC->DIFSEL_RES12 &= ~ADC_DIFSEL_DIFSEL_3;
-
-    // SENSORS_ADC->CFGR |= 0x3U << ADC_CFGR_DMNGT_Pos |
-    //                      0x5U << ADC_CFGR_RES_Pos |
-    //                      ADC_CFGR_OVRMOD;
-
-    // SENSORS_ADC->CFGR |= 13U << ADC_CFGR_EXTSEL_Pos |
-    //                      ADC_CFGR_EXTEN_0;
-
-    // SENSORS_ADC->IER |= ADC_IER_EOSIE;
-    // NVIC_EnableIRQ(ADC_IRQn);
-    
-    // SENSORS_ADC->SQR1 = 0x0U;
-    // SENSORS_ADC->SQR1 |= (2UL << ADC_SQR1_SQ1_Pos);
-    // // SENSORS_ADC->SQR1 |= (3UL << ADC_SQR1_SQ2_Pos);
-
-    // SENSORS_ADC->SMPR1 = 0x0U;
-    // SENSORS_ADC->SMPR1 |= (0x1UL << ADC_SMPR1_SMP2_Pos);
-    // // SENSORS_ADC->SMPR1 |= (0x1UL << ADC_SMPR1_SMP3_Pos);
-
-    // SENSORS_ADC->CR |= ADC_CR_ADSTART;
-
+    usart3_init();
     // ====================================================================================================
     RCC->APB1LENR |= RCC_APB1LENR_TIM6EN;
     DESC_TIM->PSC = DESC_TIM_PSC;
@@ -226,15 +172,33 @@ int main(void)
     // NVIC_EnableIRQ(DESC_TIM_IRQn);
     DESC_TIM->CR1 |= TIM_CR1_CEN;
 
+    USART3_TX_DMA_STREAM->NDTR = npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val);
+    USART3_TX_DMAMUX_CH->CCR |= npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val) << DMAMUX_CxCR_NBREQ_Pos;
+    USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+
 	for(;;)
     {
+        // if (LPTIM3->ISR & LPTIM_ISR_ARRM)
+        // {
+        //     LPTIM3->ICR |= LPTIM_ICR_ARRMCF;
+        // }
+        // if (LPTIM3->ISR & LPTIM_ISR_CMPM)
+        // {
+        //     LPTIM3->ICR |= LPTIM_ICR_CMPMCF;
+        // }
         // if (SENSORS_ADC->ISR & ADC_ISR_EOC)
         // {
         //     adc_value = SENSORS_ADC->DR;
         // }
         if (BUTTON_USER_PORT->IDR & (1UL << BUTTON_USER_PIN))
         {
-            LED_RED_PORT->ODR |= 1UL << LED_RED_PIN;
+            if (!(LED_RED_PORT->ODR & (1UL << LED_RED_PIN)))
+            {
+                LED_RED_PORT->ODR |= 1UL << LED_RED_PIN;
+                // USART3->TDR = 'A';
+                // USART3_TX_DMA_STREAM->NDTR = npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val);
+                USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+            }
         }
         else
         {

@@ -45,6 +45,7 @@ set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/rcc_cfg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/adc_cfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/usart_cfg.c
 )
 
 # Include directories for all compilers
@@ -102,6 +103,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     external/cmsis-core/CMSIS/Core/Include
     external/cmsis-device/Include
     external/cmsis-dsp/Include
+    external/nanoprintf
 )
 
 # Add project symbols (macros)
