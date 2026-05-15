@@ -17,11 +17,13 @@
  */
 
 #include <stdint.h>
+#include "arm_math_types.h"
 #include "stm32h723xx.h"
 #include "rcc_cfg.h"
 #include "adc_cfg.h"
 #include "usart_cfg.h"
 #include "nanoprintf.h"
+#include "my_math.h"
 
 
 #define                 LED_GREEN_PORT                                  GPIOB
@@ -69,6 +71,8 @@
 #define                 DESC_TIM_IRQn                                   TIM6_DAC_IRQn
 #define                 DESC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
 
+// ====================================================================================================
+
 typedef struct
 {
     float current;
@@ -81,6 +85,22 @@ volatile uint32_t cur_tran_time = 0;
 volatile uint32_t vol_conv_time = 0;
 volatile uint32_t vol_tran_time = 0;
 
+// ----------------------------------------------------------------------------------------------------
+
+float32_t R_L   = 1e-3f;                    // Inductor resistance  [Ohms]
+float32_t L     = 510e-4f;                  // Inductance           [Henries]
+float32_t C     = 5.8e-4f;                  // Capacitance          [Farads]
+float32_t f     = 10e3f;                    // Frequency            [Hz]
+float32_t V_in  = 13.0f;                    // Input voltage        [V]
+float32_t V_out = 5.0f;                     // Output voltage       [V]
+float32_t R     = 3.5f;                     // Load resistance      [Ohms]
+float32_t mu    = 8e3f;                     // Observer gain        [-]
+
+my_system_t sys;
+
+sys.A.val = { 1.0f, 0.01f, 0.0f, 1.0f };
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 int main(void)
 {
@@ -175,6 +195,8 @@ int main(void)
     USART3_TX_DMA_STREAM->NDTR = npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val);
     USART3_TX_DMAMUX_CH->CCR |= npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val) << DMAMUX_CxCR_NBREQ_Pos;
     USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+
+    // ====================================================================================================
 
 	for(;;)
     {
