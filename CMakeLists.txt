@@ -46,6 +46,7 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/rcc_cfg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/adc_cfg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/usart_cfg.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/my_math.c
 )
 
 # Include directories for all compilers
@@ -84,6 +85,17 @@ set(linker_OPTS)
 # information to the project
 include("cmake/vscode_generated.cmake")
 
+set(NEON OFF CACHE BOOL "" FORCE)
+set(NEONEXPERIMENTAL OFF CACHE BOOL "" FORCE)
+set(HELIUM OFF CACHE BOOL "" FORCE)
+set(MVEF OFF CACHE BOOL "" FORCE)
+set(MVEI OFF CACHE BOOL "" FORCE)
+set(MVEFLOAT16 OFF CACHE BOOL "" FORCE)
+set(DISABLEFLOAT16 ON CACHE BOOL "" FORCE)
+set(CMSISCORE ${CMAKE_CURRENT_SOURCE_DIR}/external/cmsis-core/CMSIS/Core)
+add_subdirectory(external/cmsis-dsp)
+target_compile_options(CMSISDSP PRIVATE ${cpu_PARAMS})
+
 # Link directories setup
 # Must be before executable is added
 link_directories(${CMAKE_PROJECT_NAME} ${link_DIRS})
@@ -102,7 +114,9 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:ASM>: ${include_asm_DIRS}>
     external/cmsis-core/CMSIS/Core/Include
     external/cmsis-device/Include
+    external/cmsis-dsp/Include/dsp
     external/cmsis-dsp/Include
+    external/cmsis-dsp/PrivateInclude
     external/nanoprintf
 )
 
@@ -119,7 +133,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS})
+target_link_libraries(${CMAKE_PROJECT_NAME} CMSISDSP ${link_LIBS})
 
 # Compiler options
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE

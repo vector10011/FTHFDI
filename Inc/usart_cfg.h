@@ -25,7 +25,7 @@
 #define                 USART3_RX_DMA_STREAM_IRQn                         DMA1_Stream3_IRQn
 #define                 USART3_RX_DMA_STREAM_IRQHandler                   DMA_STR3_IRQHandler
 
-extern volatile uint8_t usart3_tx_buf[0xFF];
-extern volatile uint8_t usart3_rx_buf[0xFF];
+extern uint8_t usart3_tx_buf[0xFF];
+extern uint8_t usart3_rx_buf[0xFF];
 
 void usart3_init(void);

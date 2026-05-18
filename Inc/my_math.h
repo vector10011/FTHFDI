@@ -1,5 +1,5 @@
 #include "arm_math.h"
-#include "dsp/matrix_functions.h"
+#include <stdint.h>
 
 #define                 MATRIX_MAX_SIZE                                   0x7UL
 
@@ -41,4 +41,5 @@ typedef struct my_system
         Number of outputs = 1
 */
 
-
+void StateSpaceModel_Init(my_system_t *model, uint16_t states, uint16_t inputs, uint16_t outputs);
+void StateSpaceModel_Step(my_system_t *model);

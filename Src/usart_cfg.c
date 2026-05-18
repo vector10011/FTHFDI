@@ -12,8 +12,8 @@
 #include "usart_cfg.h"
 #include "stm32h723xx.h"
 
-volatile uint8_t usart3_tx_buf[0xFF];
-volatile uint8_t usart3_rx_buf[0xFF];
+uint8_t usart3_tx_buf[0xFF];
+uint8_t usart3_rx_buf[0xFF];
 
 void usart3_init(void)
 {
@@ -35,13 +35,14 @@ void usart3_init(void)
 
     USART3_TX_DMAMUX_CH->CCR &= ~DMAMUX_CxCR_DMAREQ_ID;
     USART3_TX_DMAMUX_CH->CCR |= USART3_TX_DMAMUX_INPUT << DMAMUX_CxCR_DMAREQ_ID_Pos;
+    
     // DMAMUX1_RequestGenerator2->RGCR |=  0x3UL << DMAMUX_RGxCR_SIG_ID_Pos |
     //                                     0x1UL << DMAMUX_RGxCR_GPOL_Pos;
     // DMAMUX1_RequestGenerator2->RGCR |= DMAMUX_RGxCR_GE;
-    USART3_TX_DMAMUX_CH->CCR |= 0x3UL << DMAMUX_CxCR_SYNC_ID_Pos |
-                                0x1UL << DMAMUX_CxCR_SPOL_Pos;
-    
-    USART3_TX_DMAMUX_CH->CCR |= DMAMUX_CxCR_SE;
+
+    // USART3_TX_DMAMUX_CH->CCR |= 0x3UL << DMAMUX_CxCR_SYNC_ID_Pos |
+    //                             0x1UL << DMAMUX_CxCR_SPOL_Pos;
+    // USART3_TX_DMAMUX_CH->CCR |= DMAMUX_CxCR_SE;
 
 
     USART3_TX_DMA_STREAM->CR &= ~DMA_SxCR_EN;
@@ -93,7 +94,7 @@ void USART3_TX_DMA_STREAM_IRQHandler(void)
     if (USART3_DMA->LISR & DMA_LISR_TCIF2)
     {
         USART3_DMA->LIFCR |= DMA_LIFCR_CTCIF2;
-        USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+        USART3_TX_DMA_STREAM->CR &= ~DMA_SxCR_EN;
         // Handle transmission complete event
     }
 }

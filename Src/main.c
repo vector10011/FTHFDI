@@ -24,6 +24,7 @@
 #include "usart_cfg.h"
 #include "nanoprintf.h"
 #include "my_math.h"
+#include "string.h"
 
 
 #define                 LED_GREEN_PORT                                  GPIOB
@@ -36,6 +37,7 @@
 #define                 BUTTON_USER_PORT                                GPIOC
 #define                 BUTTON_USER_PIN                                 13UL
 
+#define                 TIM_REF_CLK_EN()                                (RCC->APB1LENR |= RCC_APB1LENR_TIM7EN)
 #define                 TIM_REF                                         TIM7
 #define                 TIM_REF_PSC                                     27500UL - 1UL
 #define                 TIM_REF_ARR                                     10000UL - 1UL
@@ -65,11 +67,18 @@
 // #define                 SENSORS_DMA                                     ADC1_DMA
 // #define                 SENSORS_DMA_STREAM                              ADC1_DMA_STREAM
 
-#define                 DESC_TIM                                        TIM6
-#define                 DESC_TIM_PSC                                    25UL - 1UL
-#define                 DESC_TIM_ARR                                    11UL - 1UL
-#define                 DESC_TIM_IRQn                                   TIM6_DAC_IRQn
-#define                 DESC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
+#define                 DISC_TIM_CLK_EN()                               (RCC->APB1LENR |= RCC_APB1LENR_TIM6EN)
+#define                 DISC_TIM                                        TIM6
+#define                 DISC_TIM_PSC                                    27500UL - 1UL
+#define                 DISC_TIM_ARR                                    10000UL - 1UL
+#define                 DISC_TIM_IRQn                                   TIM6_DAC_IRQn
+#define                 DISC_TIM_IRQHandler                             TIM6_DAC_IRQHandler
+
+#define                 TELE_TIM_CLK_EN()                               (RCC->APB1LENR |= RCC_APB1LENR_LPTIM1EN)
+#define                 TELE_TIM                                        LPTIM1
+#define                 TELE_TIM_PSC                                    0x0UL
+#define                 TELE_TIM_ARR                                    3277UL
+
 
 // ====================================================================================================
 
@@ -87,6 +96,8 @@ volatile uint32_t vol_tran_time = 0;
 
 // ----------------------------------------------------------------------------------------------------
 
+volatile uint32_t calc_req = 0;
+
 float32_t R_L   = 1e-3f;                    // Inductor resistance  [Ohms]
 float32_t L     = 510e-4f;                  // Inductance           [Henries]
 float32_t C     = 5.8e-4f;                  // Capacitance          [Farads]
@@ -97,8 +108,6 @@ float32_t R     = 3.5f;                     // Load resistance      [Ohms]
 float32_t mu    = 8e3f;                     // Observer gain        [-]
 
 my_system_t sys;
-
-sys.A.val = { 1.0f, 0.01f, 0.0f, 1.0f };
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
@@ -118,14 +127,14 @@ int main(void)
     // ====================================================================================================
     SCB->CPACR |= ((3UL << 10 * 2) | (3UL << 11 * 2));
     // ====================================================================================================
-    RCC->APB1LENR |= RCC_APB1LENR_TIM7EN;
+    TIM_REF_CLK_EN();
     (void)RCC->APB1LENR;
-    TIM_REF->PSC = TIM_REF_PSC;
-    TIM_REF->ARR = TIM_REF_ARR;
-    TIM_REF->CR1 |= TIM_CR1_ARPE;
-    TIM_REF->DIER |= TIM_DIER_UIE;
+    TIM_REF->PSC    =   TIM_REF_PSC;
+    TIM_REF->ARR    =   TIM_REF_ARR;
+    TIM_REF->CR1    |=  TIM_CR1_ARPE;
+    TIM_REF->DIER   |=  TIM_DIER_UIE;
     NVIC_EnableIRQ(TIM_REF_IRQn);
-    TIM_REF->CR1 |= TIM_CR1_CEN;
+    TIM_REF->CR1    |=  TIM_CR1_CEN;
     // ====================================================================================================
     // RCC->APB1LENR |= RCC_APB1LENR_TIM6EN;
     // TIM6->PSC = 27500UL - 1UL;
@@ -169,41 +178,63 @@ int main(void)
     RCC->D2CCIP2R &= ~RCC_D2CCIP2R_LPTIM1SEL;
     RCC->D2CCIP2R |= 0x4UL << RCC_D2CCIP2R_LPTIM1SEL_Pos;
 
-    RCC->APB1LENR |= RCC_APB1LENR_LPTIM1EN;
-    LPTIM1->CFGR |= 0x5UL << LPTIM_CFGR_PRESC_Pos;
-    LPTIM1->CR |= LPTIM_CR_ENABLE;
-    LPTIM1->ARR = 1024UL - 1UL;
-    while(!(LPTIM1->ISR & LPTIM_ISR_ARROK))  __NOP();
-    LPTIM1->ICR = LPTIM_ICR_ARROKCF;
-    LPTIM1->CMP = LPTIM1->ARR / 2;
-    while(!(LPTIM1->ISR & LPTIM_ISR_CMPOK))  __NOP();
-    LPTIM1->ICR = LPTIM_ICR_CMPOKCF;
-    LPTIM1->ICR = LPTIM_ICR_ARRMCF | LPTIM_ICR_CMPMCF;
-    LPTIM1->CR |= LPTIM_CR_CNTSTRT;
+    TELE_TIM_CLK_EN();
+    TELE_TIM->CFGR  |=  TELE_TIM_PSC << LPTIM_CFGR_PRESC_Pos;
+    TELE_TIM->CR    |=  LPTIM_CR_ENABLE;
+    TELE_TIM->ARR   =   TELE_TIM_ARR - 1UL;
+    while(!(TELE_TIM->ISR & LPTIM_ISR_ARROK))  __NOP();
+    TELE_TIM->ICR   =   LPTIM_ICR_ARROKCF;
+    TELE_TIM->CMP   =   TELE_TIM->ARR / 2;
+    while(!(TELE_TIM->ISR & LPTIM_ISR_CMPOK))  __NOP();
+    TELE_TIM->ICR   =   LPTIM_ICR_CMPOKCF;
+    TELE_TIM->ICR   =   LPTIM_ICR_ARRMCF | LPTIM_ICR_CMPMCF;
+    TELE_TIM->CR    |=  LPTIM_CR_CNTSTRT;
 
     usart3_init();
     // ====================================================================================================
-    RCC->APB1LENR |= RCC_APB1LENR_TIM6EN;
-    DESC_TIM->PSC = DESC_TIM_PSC;
-    DESC_TIM->ARR = DESC_TIM_ARR;
-    DESC_TIM->CR1 |= TIM_CR1_ARPE;
-    DESC_TIM->CR2 = 2UL << TIM_CR2_MMS_Pos; // Update event as TRGO
-    DESC_TIM->DIER |= TIM_DIER_UIE;
-    // NVIC_EnableIRQ(DESC_TIM_IRQn);
-    DESC_TIM->CR1 |= TIM_CR1_CEN;
+    DISC_TIM_CLK_EN();
+    DISC_TIM->PSC   =   DISC_TIM_PSC;
+    DISC_TIM->ARR   =   DISC_TIM_ARR;
+    DISC_TIM->CR1   |=  TIM_CR1_ARPE;
+    DISC_TIM->CR2   =   2UL << TIM_CR2_MMS_Pos; // Update event as TRGO
+    DISC_TIM->DIER  |=  TIM_DIER_UIE;
+    NVIC_EnableIRQ(DISC_TIM_IRQn);
+    DISC_TIM->CR1   |=  TIM_CR1_CEN;
 
-    USART3_TX_DMA_STREAM->NDTR = npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val);
-    USART3_TX_DMAMUX_CH->CCR |= npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val) << DMAMUX_CxCR_NBREQ_Pos;
-    USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+    // USART3_TX_DMA_STREAM->NDTR = npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val);
+    // USART3_TX_DMAMUX_CH->CCR |= npf_snprintf((char *)usart3_tx_buf, 0xFF, "Current: %u, Voltage: %u\r\n", cur_sen_adc_val, vol_sen_adc_val) << DMAMUX_CxCR_NBREQ_Pos;
+    // USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+
+    // ====================================================================================================
+
+    sys.A.val[0] = 0.8f;
+    sys.A.val[1] = 0.1f;
+    sys.A.val[2] = 0.0f;
+    sys.A.val[3] = 0.6f;
+
+    sys.B.val[0] = 1.0f;
+    sys.B.val[1] = 0.5f;
+
+    sys.C.val[0] = 1.0f;
+    sys.C.val[1] = 0.0f;
+
+    sys.D.val[0] = 0.0f;
+
+    sys.x.val[0] = 0.0f;
+    sys.x.val[1] = 0.0f;
+    // sys.u.val = { 0.0f };
+    sys.y.val[0] = 0.0f;
+
+    StateSpaceModel_Init(&sys, 2, 1, 1);
 
     // ====================================================================================================
 
 	for(;;)
     {
-        // if (LPTIM3->ISR & LPTIM_ISR_ARRM)
-        // {
-        //     LPTIM3->ICR |= LPTIM_ICR_ARRMCF;
-        // }
+        if (TELE_TIM->ISR & LPTIM_ISR_ARRM)
+        {
+            TELE_TIM->ICR |= LPTIM_ICR_ARRMCF;
+        }
         // if (LPTIM3->ISR & LPTIM_ISR_CMPM)
         // {
         //     LPTIM3->ICR |= LPTIM_ICR_CMPMCF;
@@ -212,6 +243,20 @@ int main(void)
         // {
         //     adc_value = SENSORS_ADC->DR;
         // }
+
+        if(calc_req)
+        {
+            calc_req = 0;
+            sys.u.val[0] = 1.0f;
+            StateSpaceModel_Step(&sys);
+            // Process output as needed
+
+            memcpy(usart3_tx_buf, &sys.y.val[0], sizeof(float32_t));
+            USART3_TX_DMA_STREAM->NDTR = sizeof(float32_t);
+
+            USART3_TX_DMA_STREAM->CR |= DMA_SxCR_EN;
+        }
+
         if (BUTTON_USER_PORT->IDR & (1UL << BUTTON_USER_PIN))
         {
             if (!(LED_RED_PORT->ODR & (1UL << LED_RED_PIN)))
@@ -230,25 +275,25 @@ int main(void)
         if(CUR_SEN_ADC->ISR & ADC_ISR_EOC)
         {
             CUR_SEN_ADC->ISR |= ADC_ISR_EOC;
-            cur_conv_time = DESC_TIM->CNT;
+            cur_conv_time = DISC_TIM->CNT;
         }
 
         // if(CUR_SEN_DMA->HISR & DMA_HISR_TCIF4)
         // {
         //     CUR_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF4;
-        //     cur_tran_time = DESC_TIM->CNT;
+        //     cur_tran_time = DISC_TIM->CNT;
         // }
 
         if(VOL_SEN_ADC->ISR & ADC_ISR_EOC)
         {
             VOL_SEN_ADC->ISR |= ADC_ISR_EOC;
-            vol_conv_time = DESC_TIM->CNT;
+            vol_conv_time = DISC_TIM->CNT;
         }
 
         // if(VOL_SEN_DMA->HISR & DMA_HISR_TCIF5)
         // {
         //     VOL_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF5;
-        //     vol_tran_time = DESC_TIM->CNT;
+        //     vol_tran_time = DISC_TIM->CNT;
         // }
     }
 }
@@ -263,12 +308,22 @@ void TIM_REF_IRQHandler(void)
     }
 }
 
+void DISC_TIM_IRQHandler(void)
+{
+    if(DISC_TIM->SR & TIM_SR_UIF)
+    {
+        DISC_TIM->SR &= ~TIM_SR_UIF;
+        
+        calc_req = 1UL;
+    }
+}
+
 void CUR_SEN_ADC_IRQHandler(void)
 {
     if(CUR_SEN_ADC->ISR & ADC_ISR_EOS)
     {
         CUR_SEN_ADC->ISR |= ADC_ISR_EOS;
-        cur_conv_time = DESC_TIM->CNT;
+        cur_conv_time = DISC_TIM->CNT;
     }
 }
 
@@ -277,7 +332,7 @@ void CUR_SEN_DMA_STREAM_IRQHandler(void)
     if(CUR_SEN_DMA->HISR & DMA_HISR_TCIF4)
     {
         CUR_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF4;
-        cur_tran_time = DESC_TIM->CNT;
+        cur_tran_time = DISC_TIM->CNT;
     }
 }
 
@@ -286,7 +341,7 @@ void VOL_SEN_ADC_IRQHandler(void)
     if(VOL_SEN_ADC->ISR & ADC_ISR_EOS)
     {
         VOL_SEN_ADC->ISR |= ADC_ISR_EOS;
-        vol_conv_time = DESC_TIM->CNT;
+        vol_conv_time = DISC_TIM->CNT;
     }
 }
 
@@ -295,6 +350,6 @@ void VOL_SEN_DMA_STREAM_IRQHandler(void)
     if(VOL_SEN_DMA->HISR & DMA_HISR_TCIF5)
     {
         VOL_SEN_DMA->HIFCR |= DMA_HIFCR_CTCIF5;
-        vol_tran_time = DESC_TIM->CNT;
+        vol_tran_time = DISC_TIM->CNT;
     }
 }
