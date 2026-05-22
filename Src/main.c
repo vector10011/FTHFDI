@@ -79,6 +79,11 @@
 #define                 TELE_TIM_PSC                                    0x0UL
 #define                 TELE_TIM_ARR                                    3277UL
 
+// ----------------------------------------------------------------------------------------------------
+
+#define                 SYS_STATES                                      2
+#define                 SYS_INPUTS                                      2
+#define                 SYS_OUTPUTS                                     1
 
 // ====================================================================================================
 
@@ -98,16 +103,53 @@ volatile uint32_t vol_tran_time = 0;
 
 volatile uint32_t calc_req = 0;
 
-float32_t R_L   = 1e-3f;                    // Inductor resistance  [Ohms]
-float32_t L     = 510e-4f;                  // Inductance           [Henries]
-float32_t C     = 5.8e-4f;                  // Capacitance          [Farads]
-float32_t f     = 10e3f;                    // Frequency            [Hz]
-float32_t V_in  = 13.0f;                    // Input voltage        [V]
-float32_t V_out = 5.0f;                     // Output voltage       [V]
-float32_t R     = 3.5f;                     // Load resistance      [Ohms]
-float32_t mu    = 8e3f;                     // Observer gain        [-]
+const float32_t R_L   = 1e-3f;                    // Inductor resistance  [Ohms]
+const float32_t L     = 510e-4f;                  // Inductance           [Henries]
+const float32_t C     = 5.8e-4f;                  // Capacitance          [Farads]
+const float32_t f     = 10e3f;                    // Frequency            [Hz]
+const float32_t V_in  = 13.0f;                    // Input voltage        [V]
+const float32_t V_out = 5.0f;                     // Output voltage       [V]
+const float32_t R     = 3.5f;                     // Load resistance      [Ohms]
+const float32_t mu    = 8e3f;                     // Observer gain        [-]
+
+float32_t A[SYS_STATES * SYS_STATES] = {
+    -R_L / L,   -1.0f / L,
+    1 / C,      0.0f
+};
+
+float32_t B_0[SYS_STATES * SYS_INPUTS] = {
+    0.0f,       0.0f,
+    0.0f,       -1.0f / C
+};
+
+float32_t B_1[SYS_STATES * SYS_INPUTS] = {
+    1.0f / L,   0.0f,
+    0.0f,       -1.0f / C
+};
+
+float32_t C[SYS_OUTPUTS * SYS_STATES] = {
+    0.0f,       1.0f
+};
+
+float32_t x[SYS_STATES] = {
+    0.0f,
+    0.0f
+};
+
+float32_t u[SYS_INPUTS] = {
+    0.0f,
+    0.0f
+};
+
+
 
 my_system_t sys;
+
+arm_matrix_instance_f32 I;
+float32_t eye[SYS_STATES * SYS_STATES] = {
+    1.0f,       0.0f,
+    0.0f,       1.0f
+};
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
@@ -207,25 +249,12 @@ int main(void)
 
     // ====================================================================================================
 
-    sys.A.val[0] = 0.8f;
-    sys.A.val[1] = 0.1f;
-    sys.A.val[2] = 0.0f;
-    sys.A.val[3] = 0.6f;
+    arm_mat_init_f32(&I, SYS_STATES, SYS_STATES, eye);
 
-    sys.B.val[0] = 1.0f;
-    sys.B.val[1] = 0.5f;
+    arm_mat_init_f32(&sys.A, SYS_STATES, SYS_STATES, A);
+    arm_mat_init_f32(&sys.B, SYS_STATES, SYS_INPUTS, B_1);
+    arm_mat_init_f32(&sys.C, SYS_OUTPUTS, SYS_STATES, C);
 
-    sys.C.val[0] = 1.0f;
-    sys.C.val[1] = 0.0f;
-
-    sys.D.val[0] = 0.0f;
-
-    sys.x.val[0] = 0.0f;
-    sys.x.val[1] = 0.0f;
-    // sys.u.val = { 0.0f };
-    sys.y.val[0] = 0.0f;
-
-    StateSpaceModel_Init(&sys, 2, 1, 1);
 
     // ====================================================================================================
 
